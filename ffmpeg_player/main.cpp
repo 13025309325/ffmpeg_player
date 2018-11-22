@@ -18,7 +18,7 @@ DWORD WINAPI thread_main3(LPVOID format)
 {
 	Format *fmt = (Format*)format;
 	int ret = 0;
-	Sleep(1);
+	//Sleep(50);
 	while (1)
 	{
 		if (fmt->v_pkts.empty())
@@ -45,7 +45,7 @@ DWORD WINAPI thread_main2(LPVOID format)
 {
 	Format *fmt = (Format*)format;
 	int ret = 0;
-	Sleep(1);
+	//Sleep(500);
 	while (1)
 	{
 		if (fmt->play_status == -3)
@@ -65,6 +65,7 @@ DWORD WINAPI thread_main2(LPVOID format)
 			cout << "decode ERR" << endl;
 			return -1;
 		}
+
 		fmt->a_pkts.pop();
 		ReleaseSemaphore(SEM, 1, NULL);
 	}
@@ -121,8 +122,7 @@ DWORD WINAPI thread_main1(LPVOID format)
 	atem_pkt = av_packet_alloc();
 	vtem_pkt = av_packet_alloc();
 	av_init_packet(fmt->pkt);
-	//av_init_packet(atem_pkt);
-	//av_init_packet(vtem_pkt);
+
 	if (!fmt->pkt)
 	{
 		cout << "packet init failuer" << endl;
@@ -138,12 +138,12 @@ DWORD WINAPI thread_main1(LPVOID format)
 	init_SDLwindow(fmt->vcodec_ctx);
 	init_audio(fmt->acodec_ctx);
 
-
 	while (1)
 	{
 		if (ret = av_read_frame(fmt->fmt_ctx, fmt->pkt) < 0)
 		{
 			cout << "read err OR  end of file " << endl;
+			Sleep(100*1000);
 			goto end;
 		}
 		
@@ -170,20 +170,8 @@ DWORD WINAPI thread_main1(LPVOID format)
 			fmt->a_pkts.push(atem_pkt);
 			ReleaseSemaphore(SEM, 1, NULL);
 		}
-
-
-		//if ((fmt->pkt->stream_index == fmt->audio_idx))
-		//{
-		//	ret = decode1(fmt->fmt_ctx, fmt->acodec_ctx, fmt->frame, fmt->pkt, fmt);
-		//	if (ret < 0)
-		//	{
-		//		cout << "audio decode ERR" << endl;
-		//		return -1;
-		//	}
-		//}
 		av_packet_unref(fmt->pkt);
 	}
-
 
 end:
 	if (fmt->pkt)

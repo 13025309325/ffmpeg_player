@@ -98,7 +98,7 @@ int play_Frame_YUV(AVCodecContext *codec_ctx, AVFrame *frame)
 	SDL_RenderClear(renderer);
 	SDL_RenderCopy(renderer, texture, NULL, NULL);
 	SDL_RenderPresent(renderer);
-	//SDL_Delay(24);
+	SDL_Delay(24);
 	SDL_PollEvent(sdlEvent);
 	switch (sdlEvent->type)
 	{
@@ -151,7 +151,7 @@ int play_frame_sound(AVFrame *frame, int ret)
 	audio_pos = audio_chunk;
 	while (audio_len >1)
 	{
-		//SDL_Delay(1);
+		SDL_Delay(1);
 	}
 	return ret;
 }
