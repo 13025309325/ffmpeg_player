@@ -1,4 +1,4 @@
 ﻿  main.cpp
-c:\users\zhang\source\repos\player2.0\player2.0\main.cpp(212): warning C4101: “streams”: 未引用的局部变量
+c:\users\zhang\source\repos\player2.0\player2.0\main.cpp(215): warning C4101: “streams”: 未引用的局部变量
   LINK : 没有找到 C:\Users\zhang\source\repos\Player2.0\x64\Debug\Player2.0.exe 或上一个增量链接没有生成它；正在执行完全链接
   Player2.0.vcxproj -> C:\Users\zhang\source\repos\Player2.0\x64\Debug\Player2.0.exe

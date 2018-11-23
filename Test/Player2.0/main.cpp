@@ -27,13 +27,15 @@ DWORD WINAPI thread_main3(LPVOID format)
 
 		if (wind_status == 0) 
 		{
+			WaitForSingleObject(SEM_V, INFINITE);
 			init_SDLwindow(fmt->vcodec_ctx);
+			ReleaseSemaphore(SEM_V, 1, NULL);
 			wind_status = 1;
 		}
 
-		WaitForSingleObject(SEM_V, INFINITE);
-
 		ret = decode2(fmt->fmt_ctx, fmt->vcodec_ctx, fmt->frame, fmt->v_pkts.front(), fmt);
+
+		WaitForSingleObject(SEM_V, INFINITE);
 		fmt->v_pkts.empty();
 		fmt->v_pkts.pop();
 		ReleaseSemaphore(SEM_V, 1, NULL);
@@ -63,14 +65,15 @@ DWORD WINAPI thread_main2(LPVOID format)
 			continue;
 
 		WaitForSingleObject(SEM_A, INFINITE);
-
+		//ReleaseSemaphore(SEM_A, 1, NULL);
 		ret = decode1(fmt->fmt_ctx, fmt->acodec_ctx, fmt->frame, fmt->a_pkts.front(), fmt);
-
+		
 		if (ret < 0)
 		{
 			cout << "decode1 ERR" << endl;
 			break;
 		}
+		//WaitForSingleObject(SEM_A, INFINITE);
 		fmt->a_pkts.empty();
 		fmt->a_pkts.pop();
 		ReleaseSemaphore(SEM_A, 1, NULL);
@@ -215,6 +218,12 @@ int main()
 
 	SEM_A = CreateSemaphore(NULL, 1, 1, NULL); 
 	SEM_V = CreateSemaphore(NULL, 1, 1, NULL);
+
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER))
+	{
+		printf("Could`t Initialize SDL - %s\n", SDL_GetError());
+		exit(0);
+	}
 
 	thread1 = CreateThread(0, 0, thread_main1, (LPVOID)&format, 0, 0);
 	thread2 = CreateThread(0, 0, thread_main2, (LPVOID)&format, 0, 0);
