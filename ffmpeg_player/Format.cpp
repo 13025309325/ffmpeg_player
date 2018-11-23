@@ -47,11 +47,7 @@ int init_codec(AVCodecContext *codec_ctx, AVFormatContext *fmt_ctx, AVCodec **co
 
 int init_SDLwindow(AVCodecContext *codec_ctx)
 {
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER))
-	{
-		printf("Could`t Initialize SDL - %s\n", SDL_GetError());
-		exit(0);
-	}
+
 
 	SDL_setenv(SDL_HINT_RENDER_SCALE_QUALITY, "linear", 0); //linear: Smooth picture quality
 

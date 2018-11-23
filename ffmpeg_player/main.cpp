@@ -12,72 +12,85 @@ int init_audio(AVCodecContext * codec_ctx);
 extern AVFrame *frame_yuv;
 extern SDL_Window *sdl_window;
 extern SDL_Event *sdlEvent;
-HANDLE SEM;
+HANDLE SEM_A,SEM_V;
 
+//play video thread
 DWORD WINAPI thread_main3(LPVOID format) 
 {
 	Format *fmt = (Format*)format;
 	int ret = 0;
-	//Sleep(50);
+	int wind_status = 0;
 	while (1)
 	{
 		if (fmt->v_pkts.empty())
 			continue;
 
-		WaitForSingleObject(SEM, INFINITE);
+		if (wind_status == 0) 
+		{
+			WaitForSingleObject(SEM_V, INFINITE);
+			init_SDLwindow(fmt->vcodec_ctx);
+			ReleaseSemaphore(SEM_V, 1, NULL);
+			wind_status = 1;
+		}
 
 		ret = decode2(fmt->fmt_ctx, fmt->vcodec_ctx, fmt->frame, fmt->v_pkts.front(), fmt);
 
-		if (ret < 0)
-		{
-			cout << "decode ERR" << endl;
-			fmt->play_status = -3;
-			return -1;
-		}
+		WaitForSingleObject(SEM_V, INFINITE);
+		av_packet_free(&fmt->v_pkts.front());
+		fmt->v_pkts.empty();
 		fmt->v_pkts.pop();
-		ReleaseSemaphore(SEM, 1, NULL);
-	}
+		ReleaseSemaphore(SEM_V, 1, NULL);
 
+		if (ret == -2)
+		{
+			fmt->play_status = -3;
+			break;
+		}
+	}
+	cout << "Play video thread EXIT" << endl;
 	return 0;
 }
 
+//play audio thread
 DWORD WINAPI thread_main2(LPVOID format)
 {
 	Format *fmt = (Format*)format;
 	int ret = 0;
-	//Sleep(500);
+
 	while (1)
 	{
 		if (fmt->play_status == -3)
-		{
-			cout << "fmt->play_status  = " << fmt->play_status << endl;
-			exit(1);
-		}
+			break;
+		
 		if (fmt->a_pkts.empty())
 			continue;
 
-		WaitForSingleObject(SEM, INFINITE);
+		WaitForSingleObject(SEM_A, INFINITE);
 
 		ret = decode1(fmt->fmt_ctx, fmt->acodec_ctx, fmt->frame, fmt->a_pkts.front(), fmt);
-
+		ReleaseSemaphore(SEM_A, 1, NULL);
 		if (ret < 0)
 		{
-			cout << "decode ERR" << endl;
-			return -1;
+			cout << "decode1 ERR" << endl;
+			break;
 		}
 
+		WaitForSingleObject(SEM_A, INFINITE);
+		av_packet_free(&fmt->a_pkts.front());
+		fmt->a_pkts.empty();
 		fmt->a_pkts.pop();
-		ReleaseSemaphore(SEM, 1, NULL);
+		ReleaseSemaphore(SEM_A, 1, NULL);
 	}
+
+	cout << "Play audio thread EXIT" << endl;
 	return 0;
 }
 
+//decode thread 
 DWORD WINAPI thread_main1(LPVOID format)
 {
 	av_register_all();
 	Format *fmt = (Format*)format;
-	AVPacket *atem_pkt = nullptr ,*vtem_pkt = nullptr;
-	HANDLE thread3;
 	fmt->fmt_ctx = nullptr;
 	 int i = 0;
 
@@ -119,8 +132,6 @@ DWORD WINAPI thread_main1(LPVOID format)
 	fmt->vcodec_ctx = avcodec_alloc_context3(NULL);
 
 	fmt->pkt = av_packet_alloc();
-	atem_pkt = av_packet_alloc();
-	vtem_pkt = av_packet_alloc();
 	av_init_packet(fmt->pkt);
 
 	if (!fmt->pkt)
@@ -135,7 +146,6 @@ DWORD WINAPI thread_main1(LPVOID format)
 	}
 	init_codec(fmt->vcodec_ctx,fmt->fmt_ctx,&fmt->vcodec,fmt->video_idx);
 	init_codec(fmt->acodec_ctx, fmt->fmt_ctx, &fmt->acodec, fmt->audio_idx); 
-	init_SDLwindow(fmt->vcodec_ctx);
 	init_audio(fmt->acodec_ctx);
 
 	while (1)
@@ -143,37 +153,45 @@ DWORD WINAPI thread_main1(LPVOID format)
 		if (ret = av_read_frame(fmt->fmt_ctx, fmt->pkt) < 0)
 		{
 			cout << "read err OR  end of file " << endl;
-			Sleep(100*1000);
 			goto end;
 		}
 		
 		if (fmt->pkt->stream_index == fmt->video_idx)
 		{
-			WaitForSingleObject(SEM, INFINITE);
+			
+			AVPacket *vtem_pkt = av_packet_alloc();
 			if (av_packet_ref(vtem_pkt, fmt->pkt))
 			{
 				cout << "¿ËÂ¡Ê§°Ü" << endl;
 				continue;
 			}
+			WaitForSingleObject(SEM_V, INFINITE);
 			fmt->v_pkts.push(vtem_pkt);
-			ReleaseSemaphore(SEM, 1, NULL);
+			ReleaseSemaphore(SEM_V, 1, NULL);
 		}
 
 		if ((fmt->pkt->stream_index == fmt->audio_idx))
 		{
-			WaitForSingleObject(SEM, INFINITE);
+			AVPacket *atem_pkt = av_packet_alloc();
 			if (av_packet_ref(atem_pkt, fmt->pkt))
 			{
 				cout << "¿ËÂ¡Ê§°Ü" << endl;
 				continue;
 			}
+			WaitForSingleObject(SEM_A, INFINITE);
 			fmt->a_pkts.push(atem_pkt);
-			ReleaseSemaphore(SEM, 1, NULL);
+			ReleaseSemaphore(SEM_A, 1, NULL);
 		}
-		av_packet_unref(fmt->pkt);
-	}
 
+		av_packet_unref(fmt->pkt);
+
+		if (fmt->play_status == -3 )
+		{
+			break;
+		}
+	}
 end:
+	cout << "Memory freeing" << endl;
 	if (fmt->pkt)
 		av_packet_free(&fmt->pkt);
 	if (fmt->frame)
@@ -186,10 +204,7 @@ end:
 		avformat_free_context(fmt->fmt_ctx);
 	if (frame_yuv)
 		av_frame_free(&frame_yuv);
-	if (atem_pkt)
-		av_packet_free(&atem_pkt);
-	if(vtem_pkt)
-		av_packet_free(&vtem_pkt);
+	cout << "Decode thread EXIT" << endl;
 	return 0;
 }
 
@@ -200,14 +215,22 @@ int main()
 	format.play_status = -1;
 	HANDLE thread1,thread2, thread3;
 
-	SEM = CreateSemaphore(NULL, 1, 1, NULL); 
+	SEM_A = CreateSemaphore(NULL, 1, 1, NULL); 
+	SEM_V = CreateSemaphore(NULL, 1, 1, NULL);
+
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER))
+	{
+		printf("Could`t Initialize SDL - %s\n", SDL_GetError());
+		exit(0);
+	}
 
 	thread1 = CreateThread(0, 0, thread_main1, (LPVOID)&format, 0, 0);
-	thread2 = CreateThread(0, 0, thread_main2, &format, 0, 0);
-	thread3 = CreateThread(0, 0, thread_main3, &format, 0, 0);
+	thread2 = CreateThread(0, 0, thread_main2, (LPVOID)&format, 0, 0);
+	thread3 = CreateThread(0, 0, thread_main3, (LPVOID)&format, 0, 0);
 
 	WaitForSingleObject(thread1, INFINITE);
 	WaitForSingleObject(thread2, INFINITE);
 	WaitForSingleObject(thread3, INFINITE);
+	SDL_Quit();
 	return 0;
 }
