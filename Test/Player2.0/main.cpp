@@ -36,6 +36,7 @@ DWORD WINAPI thread_main3(LPVOID format)
 		ret = decode2(fmt->fmt_ctx, fmt->vcodec_ctx, fmt->frame, fmt->v_pkts.front(), fmt);
 
 		WaitForSingleObject(SEM_V, INFINITE);
+		av_packet_free(&fmt->v_pkts.front());
 		fmt->v_pkts.empty();
 		fmt->v_pkts.pop();
 		ReleaseSemaphore(SEM_V, 1, NULL);
@@ -65,15 +66,17 @@ DWORD WINAPI thread_main2(LPVOID format)
 			continue;
 
 		WaitForSingleObject(SEM_A, INFINITE);
-		//ReleaseSemaphore(SEM_A, 1, NULL);
+
 		ret = decode1(fmt->fmt_ctx, fmt->acodec_ctx, fmt->frame, fmt->a_pkts.front(), fmt);
-		
+		ReleaseSemaphore(SEM_A, 1, NULL);
 		if (ret < 0)
 		{
 			cout << "decode1 ERR" << endl;
 			break;
 		}
-		//WaitForSingleObject(SEM_A, INFINITE);
+
+		WaitForSingleObject(SEM_A, INFINITE);
+		av_packet_free(&fmt->a_pkts.front());
 		fmt->a_pkts.empty();
 		fmt->a_pkts.pop();
 		ReleaseSemaphore(SEM_A, 1, NULL);
@@ -88,7 +91,6 @@ DWORD WINAPI thread_main1(LPVOID format)
 {
 	av_register_all();
 	Format *fmt = (Format*)format;
-	AVPacket *atem_pkt = nullptr ,*vtem_pkt = nullptr;
 	fmt->fmt_ctx = nullptr;
 	 int i = 0;
 
@@ -130,8 +132,6 @@ DWORD WINAPI thread_main1(LPVOID format)
 	fmt->vcodec_ctx = avcodec_alloc_context3(NULL);
 
 	fmt->pkt = av_packet_alloc();
-	atem_pkt = av_packet_alloc();
-	vtem_pkt = av_packet_alloc();
 	av_init_packet(fmt->pkt);
 
 	if (!fmt->pkt)
@@ -159,6 +159,7 @@ DWORD WINAPI thread_main1(LPVOID format)
 		if (fmt->pkt->stream_index == fmt->video_idx)
 		{
 			
+			AVPacket *vtem_pkt = av_packet_alloc();
 			if (av_packet_ref(vtem_pkt, fmt->pkt))
 			{
 				cout << "¿ËÂ¡Ê§°Ü" << endl;
@@ -171,7 +172,7 @@ DWORD WINAPI thread_main1(LPVOID format)
 
 		if ((fmt->pkt->stream_index == fmt->audio_idx))
 		{
-			
+			AVPacket *atem_pkt = av_packet_alloc();
 			if (av_packet_ref(atem_pkt, fmt->pkt))
 			{
 				cout << "¿ËÂ¡Ê§°Ü" << endl;
@@ -183,13 +184,14 @@ DWORD WINAPI thread_main1(LPVOID format)
 		}
 
 		av_packet_unref(fmt->pkt);
+
 		if (fmt->play_status == -3 )
 		{
-			cout << "Decode thread EXIT" << endl;
 			break;
 		}
 	}
 end:
+	cout << "Memory freeing" << endl;
 	if (fmt->pkt)
 		av_packet_free(&fmt->pkt);
 	if (fmt->frame)
@@ -202,10 +204,7 @@ end:
 		avformat_free_context(fmt->fmt_ctx);
 	if (frame_yuv)
 		av_frame_free(&frame_yuv);
-	if (atem_pkt)
-		av_packet_free(&atem_pkt);
-	if(vtem_pkt)
-		av_packet_free(&vtem_pkt);
+	cout << "Decode thread EXIT" << endl;
 	return 0;
 }
 
