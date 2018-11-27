@@ -1,0 +1,6 @@
+﻿  Format.cpp
+c:\users\zhang\source\repos\player2.0\player2.0\format.cpp(161): warning C4018: “>”: 有符号/无符号不匹配
+c:\users\zhang\source\repos\player2.0\player2.0\format.cpp(200): warning C4101: “pts”: 未引用的局部变量
+c:\users\zhang\source\repos\player2.0\player2.0\format.cpp(234): warning C4101: “pts”: 未引用的局部变量
+  LINK : 没有找到 C:\Users\zhang\source\repos\Player2.0\x64\Debug\Player2.0.exe 或上一个增量链接没有生成它；正在执行完全链接
+  Player2.0.vcxproj -> C:\Users\zhang\source\repos\Player2.0\x64\Debug\Player2.0.exe
